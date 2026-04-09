@@ -1,0 +1,46 @@
+/* LLM Wiki Plugin Styles */
+
+.llm-wiki-modal {
+  padding: 1em;
+}
+
+.llm-wiki-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8em;
+}
+
+.llm-wiki-modal textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+}
+
+.llm-wiki-modal .result-container {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 1em;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+}
+
+.llm-wiki-status {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.llm-wiki-lint-issue {
+  padding: 0.5em;
+  margin-bottom: 0.5em;
+  border-left: 3px solid var(--text-warning);
+  background: var(--background-secondary);
+  border-radius: 0 4px 4px 0;
+}
+
+.llm-wiki-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.5em 0;
+}
