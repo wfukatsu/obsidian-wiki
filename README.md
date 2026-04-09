@@ -27,7 +27,7 @@ log.md            ← 操作の時系列ログ
 ### ビルド
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/wfukatsu/obsidian-wiki.git
 cd obsidian-wiki
 npm install
 npm run build
