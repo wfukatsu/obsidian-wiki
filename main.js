@@ -17032,14 +17032,38 @@ ${sourceContent}`;
     pagesCreated: [],
     pagesUpdated: []
   };
+  const wikiDirNormalized = settings.wikiDir.replace(/\/+$/, "");
+  const sourcesDirNormalized = settings.sourcesDir.replace(/\/+$/, "");
   for (const page of parsed.pages) {
-    const pagePath = (0, import_obsidian2.normalizePath)(page.path);
+    let pagePath = (0, import_obsidian2.normalizePath)(page.path);
+    const isProtected = pagePath.startsWith(sourcesDirNormalized + "/") || pagePath === (0, import_obsidian2.normalizePath)(settings.schemaFile) || pagePath === (0, import_obsidian2.normalizePath)(settings.indexFile) || pagePath === (0, import_obsidian2.normalizePath)(settings.logFile);
+    if (isProtected || !pagePath.startsWith(wikiDirNormalized + "/")) {
+      const filename = pagePath.split("/").pop() || "untitled.md";
+      const fixed = (0, import_obsidian2.normalizePath)(`${wikiDirNormalized}/${filename}`);
+      console.warn(
+        `[LLM Wiki] Path '${pagePath}' is outside wikiDir or protected, redirecting to '${fixed}'`
+      );
+      pagePath = fixed;
+    }
     const existing = app.vault.getAbstractFileByPath(pagePath);
     if (existing instanceof import_obsidian2.TFile && page.action === "update") {
       const oldContent = await app.vault.read(existing);
       const merged = await mergeContent(llm, oldContent, page.content);
       await app.vault.modify(existing, merged);
       result.pagesUpdated.push(pagePath);
+    } else if (existing instanceof import_obsidian2.TFile && page.action === "create") {
+      const ts = Date.now();
+      const dotIdx = pagePath.lastIndexOf(".");
+      const suffixed = dotIdx >= 0 ? pagePath.slice(0, dotIdx) + `-${ts}` + pagePath.slice(dotIdx) : pagePath + `-${ts}`;
+      console.warn(
+        `[LLM Wiki] '${pagePath}' already exists, creating '${suffixed}' instead`
+      );
+      const dir = suffixed.substring(0, suffixed.lastIndexOf("/"));
+      if (dir && !app.vault.getAbstractFileByPath(dir)) {
+        await app.vault.createFolder(dir);
+      }
+      await app.vault.create(suffixed, page.content);
+      result.pagesCreated.push(suffixed);
     } else {
       const dir = pagePath.substring(0, pagePath.lastIndexOf("/"));
       if (dir && !app.vault.getAbstractFileByPath(dir)) {

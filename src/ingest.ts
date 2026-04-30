@@ -103,8 +103,32 @@ ${sourceContent}`;
   };
 
   // Write/update wiki pages
+  // 安全ガード: 小型モデル (gemma3:1b 等) が page.path に "sources/..." を返してきても
+  // 元のソースファイルを書き換えないよう、wikiDir 配下に強制的にリダイレクトする。
+  const wikiDirNormalized = settings.wikiDir.replace(/\/+$/, "");
+  const sourcesDirNormalized = settings.sourcesDir.replace(/\/+$/, "");
+
   for (const page of parsed.pages) {
-    const pagePath = normalizePath(page.path);
+    let pagePath = normalizePath(page.path);
+
+    // (1) sources/ や schema.md/index.md/log.md を絶対に上書きしない
+    const isProtected =
+      pagePath.startsWith(sourcesDirNormalized + "/") ||
+      pagePath === normalizePath(settings.schemaFile) ||
+      pagePath === normalizePath(settings.indexFile) ||
+      pagePath === normalizePath(settings.logFile);
+
+    // (2) wikiDir 配下でなければ wikiDir 配下に強制リダイレクト
+    if (isProtected || !pagePath.startsWith(wikiDirNormalized + "/")) {
+      const filename = pagePath.split("/").pop() || "untitled.md";
+      const fixed = normalizePath(`${wikiDirNormalized}/${filename}`);
+      console.warn(
+        `[LLM Wiki] Path '${pagePath}' is outside wikiDir or protected, ` +
+          `redirecting to '${fixed}'`
+      );
+      pagePath = fixed;
+    }
+
     const existing = app.vault.getAbstractFileByPath(pagePath);
 
     if (existing instanceof TFile && page.action === "update") {
@@ -113,6 +137,23 @@ ${sourceContent}`;
       const merged = await mergeContent(llm, oldContent, page.content);
       await app.vault.modify(existing, merged);
       result.pagesUpdated.push(pagePath);
+    } else if (existing instanceof TFile && page.action === "create") {
+      // create だが既存ファイルあり → ファイル名にサフィックスを付けて回避
+      const ts = Date.now();
+      const dotIdx = pagePath.lastIndexOf(".");
+      const suffixed =
+        dotIdx >= 0
+          ? pagePath.slice(0, dotIdx) + `-${ts}` + pagePath.slice(dotIdx)
+          : pagePath + `-${ts}`;
+      console.warn(
+        `[LLM Wiki] '${pagePath}' already exists, creating '${suffixed}' instead`
+      );
+      const dir = suffixed.substring(0, suffixed.lastIndexOf("/"));
+      if (dir && !app.vault.getAbstractFileByPath(dir)) {
+        await app.vault.createFolder(dir);
+      }
+      await app.vault.create(suffixed, page.content);
+      result.pagesCreated.push(suffixed);
     } else {
       // Ensure directory exists
       const dir = pagePath.substring(0, pagePath.lastIndexOf("/"));
