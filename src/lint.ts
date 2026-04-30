@@ -1,5 +1,5 @@
 import { App, TFile, normalizePath } from "obsidian";
-import { LLMClient } from "./llm";
+import { LLMClient, extractJson } from "./llm";
 import type { LLMWikiSettings, LintIssue } from "./types";
 
 const LINT_SYSTEM = `You are a wiki quality auditor. Review the wiki pages for issues.
@@ -73,15 +73,19 @@ Please audit this wiki for issues.`;
 
   const response = await llm.call(LINT_SYSTEM, userMessage);
 
-  let parsed;
+  let parsed: any;
   try {
     parsed = JSON.parse(response);
   } catch {
-    return {
-      issues: [],
-      healthScore: 0,
-      summary: "Failed to parse lint results: " + response.slice(0, 200),
-    };
+    // 思考タグ除去 + JSON 抽出フォールバック
+    parsed = extractJson(response);
+    if (!parsed) {
+      return {
+        issues: [],
+        healthScore: 0,
+        summary: "Failed to parse lint results: " + response.slice(0, 200),
+      };
+    }
   }
 
   return {
