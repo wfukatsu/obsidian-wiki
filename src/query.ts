@@ -1,5 +1,5 @@
 import { App, TFile, normalizePath } from "obsidian";
-import { LLMClient } from "./llm";
+import { LLMClient, extractJson } from "./llm";
 import type { LLMWikiSettings, QueryResult } from "./types";
 
 const QUERY_SYSTEM = `You are a wiki assistant. You answer questions by searching through the personal wiki pages provided.
@@ -55,16 +55,20 @@ ${question}`;
 
   const response = await llm.call(QUERY_SYSTEM, userMessage);
 
-  let parsed;
+  let parsed: any;
   try {
     parsed = JSON.parse(response);
   } catch {
-    // If JSON parse fails, treat the whole response as the answer
-    return {
-      answer: response,
-      citations: [],
-      shouldSave: false,
-    };
+    // 思考タグ除去 + JSON 抽出フォールバック
+    parsed = extractJson(response);
+    if (!parsed) {
+      // 完全に失敗したら、応答を答えとして返す
+      return {
+        answer: response,
+        citations: [],
+        shouldSave: false,
+      };
+    }
   }
 
   return {

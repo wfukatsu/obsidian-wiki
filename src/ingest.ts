@@ -1,5 +1,5 @@
 import { App, TFile, Notice, normalizePath } from "obsidian";
-import { LLMClient } from "./llm";
+import { LLMClient, extractJson } from "./llm";
 import type { LLMWikiSettings, IngestResult } from "./types";
 
 const INGEST_SYSTEM = `You are a wiki maintainer. You receive a source document and the current state of a personal wiki.
@@ -81,11 +81,19 @@ ${sourceContent}`;
   new Notice("LLM Wiki: Ingesting source...");
   const response = await llm.call(INGEST_SYSTEM, userMessage);
 
-  let parsed;
+  // 直接 parse → 失敗したら extractJson() でフォールバック (思考タグ除去 / フェンス除去 / { } 抽出)
+  let parsed: any;
   try {
     parsed = JSON.parse(response);
   } catch {
-    throw new Error("LLM returned invalid JSON. Response:\n" + response.slice(0, 500));
+    parsed = extractJson(response);
+    if (!parsed) {
+      throw new Error(
+        "LLM returned invalid JSON even after extraction fallback. " +
+          "Response head:\n" +
+          response.slice(0, 500)
+      );
+    }
   }
 
   const result: IngestResult = {
